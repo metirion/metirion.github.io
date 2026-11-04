@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Metirion Analytics</title>
+<style>
+:root{color-scheme:light;--bg:#F7F5F0;--surface:#FFFFFF;--border:#E6E2D9;--grid:#EEEAE2;--text:#192F43;--text2:#475569;--muted:#7A8696;--series:#244760;--seq1:#DCE6F2;--seq2:#9DB9DA;--seq3:#4F7FB5;--seq4:#1F4775;--up:#2E7D4F;--down:#B4442F;--banner:#F4EAD7}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#0F1C2A;--surface:#162638;--border:#24384F;--grid:#1F3247;--text:#ECEFF3;--text2:#B8C2CF;--muted:#8C99A8;--series:#8FB4DC;--seq1:#2A4361;--seq2:#3E6A9C;--seq3:#6E9DD3;--seq4:#B7D2F1;--up:#6CC08E;--down:#F08A73;--banner:#2B2A22}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+header{background:#142C43;color:#fff;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.logo{width:34px;height:34px;border-radius:9px;background:#244760;display:grid;place-items:center;font-weight:800;position:relative}
+.logo:after{content:"";position:absolute;top:7px;right:8px;width:5px;height:5px;border-radius:50%;background:#E4C58B}
+header h1{font-size:17px;margin:0}header .sub{color:#C9D3DD;font-size:12px}
+header .who{margin-left:auto;font-size:12px;color:#C9D3DD;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pill{background:#E4C58B;color:#263447;border-radius:999px;padding:2px 10px;font-weight:700;font-size:11px}
+.wrap{max-width:1200px;margin:0 auto;padding:16px}
+.banner{background:var(--banner);border:1px solid var(--border);border-radius:12px;padding:10px 14px;margin-bottom:14px;font-size:13px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:14px;overflow-x:auto}
+.tab{background:none;border:0;padding:10px 14px;font:inherit;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+.tab[aria-selected="true"]{color:var(--text);border-bottom-color:#E4C58B;font-weight:700}
+.filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:none;padding:6px 12px;font:inherit;color:var(--text2);cursor:pointer}
+.seg button[aria-pressed="true"]{background:#142C43;color:#fff}
+select,input[type=email],input[type=text]{font:inherit;padding:7px 10px;border-radius:10px;border:1px solid var(--border);background:var(--surface);color:var(--text)}
+.grid{display:grid;gap:14px}.g4{grid-template-columns:repeat(4,minmax(0,1fr))}.g2{grid-template-columns:repeat(2,minmax(0,1fr))}.g32{grid-template-columns:2fr 1fr}
+@media(max-width:900px){.g4{grid-template-columns:repeat(2,minmax(0,1fr))}.g2,.g32{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;min-width:0}
+.card h3{margin:0 0 2px;font-size:14px}.card .hint{color:var(--muted);font-size:12px;margin:0 0 10px}
+.stat .label{color:var(--text2);font-size:12px}.stat .val{font-size:28px;font-weight:750;letter-spacing:-.5px;margin-top:2px}.stat .delta{font-size:12px;color:var(--text2)}
+.up{color:var(--up);font-weight:700}.down{color:var(--down);font-weight:700}
+svg{display:block;width:100%;height:auto;overflow:visible}svg text{fill:var(--text2);font-size:11px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--text2);margin-top:8px}.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--border);vertical-align:middle}
+th{color:var(--text2);font-weight:600;font-size:12px;white-space:nowrap}td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+tr.click{cursor:pointer}tr.click:hover td{background:color-mix(in srgb,#E4C58B 14%,transparent)}
+.tablewrap{overflow-x:auto}.tag{display:inline-block;border:1px solid var(--border);border-radius:999px;padding:1px 8px;font-size:11px;color:var(--text2);margin-right:4px}
+#tip{position:fixed;pointer-events:none;background:#142C43;color:#fff;padding:7px 10px;border-radius:8px;font-size:12px;line-height:1.35;opacity:0;z-index:10;max-width:240px}
+.hidden{display:none}.note{font-size:12px;color:var(--muted)}.empty{color:var(--muted);padding:18px 4px;font-size:13px}
+.btn{font:inherit;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:10px;padding:7px 14px;cursor:pointer}
+.btn.gold{background:#E4C58B;color:#263447;border-color:#E4C58B;font-weight:700}.btn.small{padding:3px 10px;font-size:12px}
+.profile{display:flex;gap:14px;align-items:center;flex-wrap:wrap}.avatar{width:48px;height:48px;border-radius:50%;background:#E4C58B;color:#263447;display:grid;place-items:center;font-weight:800;font-size:18px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px}.kv b{color:var(--text2);font-weight:600}
+.login{max-width:420px;margin:60px auto;text-align:center}.login h2{margin:0 0 6px}.login p{color:var(--text2)}.login form{display:flex;gap:8px;margin-top:14px}.login input{flex:1}
+.err{color:var(--down);font-size:13px;margin-top:10px}.ok{color:var(--up);font-size:13px;margin-top:10px}
+.bar-cell{display:flex;align-items:center;gap:8px;justify-content:flex-end}.bar-cell .b{height:8px;border-radius:4px;background:var(--series);display:inline-block}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">M</div>
+  <div><h1>Metirion Analytics</h1><div class="sub">Student progress · BT · MA · FA</div></div>
+  <div class="who" id="who"></div>
+</header>
+<div class="wrap" id="app"><div class="empty">Loading…</div></div>
+<div id="tip"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+const SUPABASE_URL='https://jpagpyijnlvqgzaenqzt.supabase.co';
+const SUPABASE_KEY='sb_publishable_4xhNc7p7qwoIdBLZQzNgBw_ACLnk2Ot'; // publishable key: safe to expose; access is enforced by database rules
+const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,detectSessionInUrl:true}});
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const DAY=864e5;
+const LEVELS=['Not studied','Learning','Reviewed','Mastered'];
+const lvl=v=>{v=String(v??'').toLowerCase().replace(/[_-]/g,' ').trim();return v.startsWith('master')?3:v.startsWith('review')?2:v.startsWith('learn')?1:0};
+const S={role:null,email:null,students:[],attempts:[],mistakes:[],mastery:[],streaks:[],team:[],range:30,paper:'ALL',group:'ALL',tab:'overview',current:null};
+
+/* ---------- auth ---------- */
+function loginView(msg,cls){
+  $('who').innerHTML='';
+  $('app').innerHTML=`<div class="card login"><h2>Sign in</h2><p>For Metirion and partner team members. Enter your work email and we'll send you a one-time sign-in link.</p>
+  <form id="lf"><input type="email" id="le" placeholder="you@example.com" autocomplete="email" required><button class="btn gold" type="submit">Send link</button></form>
+  <div class="${cls||'note'}" id="lm">${esc(msg||'')}</div></div>`;
+  $('lf').onsubmit=async e=>{e.preventDefault();const email=$('le').value.trim().toLowerCase();$('lm').className='note';$('lm').textContent='Sending…';
+    const {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin+location.pathname,shouldCreateUser:false}});
+    if(error){$('lm').className='err';$('lm').textContent=/signups not allowed|not found/i.test(error.message)?'No Metirion account exists for this email yet. Sign in once in the Metirion app with it, then try again.':error.message}
+    else{$('lm').className='ok';$('lm').textContent='Check your inbox for the sign-in link. Open it on this device.'}};
+}
+function noAccess(email){
+  $('who').innerHTML=`${esc(email)} <button class="btn small" id="so">Sign out</button>`;$('so').onclick=signOut;
+  $('app').innerHTML=`<div class="card login"><h2>No access</h2><p>${esc(email)} is not on the dashboard access list. Ask the Metirion owner to add you.</p></div>`;
+}
+async function signOut(){await sb.auth.signOut();location.hash='';loginView()}
+
+/* ---------- data ---------- */
+async function fetchAll(table,cols){let out=[],from=0;for(;;){const {data,error}=await sb.from(table).select(cols).range(from,from+999);if(error)throw error;out=out.concat(data);if(data.length<1000)break;from+=1000}return out}
+async function loadAll(){
+  const [st,at,mi,ma,sk,tm]=await Promise.all([
+    fetchAll('profiles','user_id,full_name,first_name,last_name,email,phone,student_status,study_mode,coaching_center_name,institution,occupation,subjects_interested,planned_exam_date,referral_source,is_mahe_student,created_at,onboarding_completed_at'),
+    fetchAll('test_attempts','id,user_id,kind,paper_code,chapter_id,score,total_marks,data,completed_at'),
+    fetchAll('mistakes','id,user_id,paper_code,topic_id,data,created_at'),
+    fetchAll('mastery_events','id,user_id,paper_code,topic_id,data,created_at'),
+    fetchAll('streaks','user_id,streak_type,current_streak,longest_streak,last_activity_date,updated_at'),
+    sb.from('admin_users').select('*').order('role').then(r=>r.data||[])]);
+  S.students=st;S.attempts=at.map(a=>({...a,t:+new Date(a.completed_at),pct:a.total_marks>0?Math.round(100*a.score/a.total_marks):null}));
+  S.mistakes=mi.map(m=>({...m,t:+new Date(m.created_at)}));S.mastery=ma.map(m=>({...m,t:+new Date(m.created_at)}));S.streaks=sk;S.team=tm;
+  const byId={};S.students.forEach(s=>{s.name=(s.full_name||[s.first_name,s.last_name].filter(Boolean).join(' ')||'Student '+String(s.user_id).slice(0,4)).trim();s.group=s.is_mahe_student?'MAHE':(s.coaching_center_name||s.institution||'Self-study / other');byId[s.user_id]=s});S.byId=byId;
+}
+const inRange=(t,days,offset=0)=>t>=Date.now()-(days+offset)*DAY&&t<Date.now()-offset*DAY;
+function visibleStudents(){return S.students.filter(s=>S.group==='ALL'||s.group===S.group)}
+function idset(){return new Set(visibleStudents().map(s=>s.user_id))}
+const papers=()=>[...new Set([...S.attempts,...S.mistakes,...S.mastery].map(x=>x.paper_code).filter(Boolean))].sort();
+function lastActive(uid){let t=0;for(const l of [S.attempts,S.mistakes,S.mastery])for(const x of l)if(x.user_id===uid&&x.t>t)t=x.t;for(const k of S.streaks)if(k.user_id===uid){const u=+new Date(k.updated_at);if(u>t)t=u}return t}
+const ago=t=>{if(!t)return '—';const d=Math.floor((Date.now()-t)/DAY);return d<=0?'Today':d===1?'Yesterday':d+' days ago'};
+const avg=a=>a.length?Math.round(a.reduce((x,y)=>x+y,0)/a.length):null;
+const fmtD=t=>new Date(t).toLocaleDateString(undefined,{day:'numeric',month:'short'});
+
+/* ---------- chart helpers ---------- */
+const tip=$('tip');const showTip=(e,h)=>{tip.innerHTML=h;tip.style.opacity=1;tip.style.left=Math.min(e.clientX+14,innerWidth-250)+'px';tip.style.top=(e.clientY+14)+'px'};const hideTip=()=>tip.style.opacity=0;
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();const NS='http://www.w3.org/2000/svg';
+function el(t,a={},p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e}
+function svgBox(h,w,ht){h.innerHTML='';return el('svg',{viewBox:`0 0 ${w} ${ht}`,role:'img'},h)}
+function lineChart(host,vals,labels,o={}){
+  if(!vals.length||vals.every(v=>v==null)){host.innerHTML='<div class="empty">No data yet.</div>';return}
+  const W=560,H=210,m={l:34,r:12,t:12,b:26},s=svgBox(host,W,H);const max=o.max||Math.max(4,Math.ceil(Math.max(...vals.filter(v=>v!=null))*1.1/4)*4),min=0;
+  const n=Math.max(vals.length-1,1),x=i=>m.l+i*(W-m.l-m.r)/n,y=v=>m.t+(1-(v-min)/(max-min))*(H-m.t-m.b);
+  for(let k=0;k<=4;k++){const v=min+k*(max-min)/4;el('line',{x1:m.l,x2:W-m.r,y1:y(v),y2:y(v),stroke:css('--grid')},s);el('text',{x:m.l-6,y:y(v)+4,'text-anchor':'end'},s).textContent=Math.round(v)+(o.unit||'')}
+  labels.forEach((l,i)=>{if(i%(o.every||1)===0||i===labels.length-1)el('text',{x:x(i),y:H-6,'text-anchor':'middle'},s).textContent=l});
+  if(o.ref!=null)el('line',{x1:m.l,x2:W-m.r,y1:y(o.ref),y2:y(o.ref),stroke:css('--muted'),'stroke-dasharray':'4 4'},s);
+  const pts=vals.map((v,i)=>v==null?null:[x(i),y(v),i]).filter(Boolean);
+  el('path',{d:pts.map((p,i)=>(i?'L':'M')+p[0]+' '+p[1]).join(' '),fill:'none',stroke:css('--series'),'stroke-width':2,'stroke-linejoin':'round'},s);
+  const lp=pts[pts.length-1];el('circle',{cx:lp[0],cy:lp[1],r:4,fill:css('--series'),stroke:css('--surface'),'stroke-width':2},s);
+  const lt=el('text',{x:lp[0]-6,y:lp[1]-10,'text-anchor':'end',style:'fill:var(--text);font-weight:700'},s);lt.textContent=vals[lp[2]]+(o.unit||'');
+  const cr=el('line',{y1:m.t,y2:H-m.b,stroke:css('--muted'),opacity:0},s),dot=el('circle',{r:4,fill:css('--series'),stroke:css('--surface'),'stroke-width':2,opacity:0},s);
+  const hit=el('rect',{x:m.l,y:m.t,width:W-m.l-m.r,height:H-m.t-m.b,fill:'transparent'},s);
+  hit.addEventListener('mousemove',e=>{const b=s.getBoundingClientRect();let i=Math.round(((e.clientX-b.left)*W/b.width-m.l)/((W-m.l-m.r)/n));i=Math.max(0,Math.min(vals.length-1,i));if(vals[i]==null)return;cr.setAttribute('x1',x(i));cr.setAttribute('x2',x(i));cr.setAttribute('opacity',.6);dot.setAttribute('cx',x(i));dot.setAttribute('cy',y(vals[i]));dot.setAttribute('opacity',1);showTip(e,`<b>${esc(labels[i])}</b><br>${esc(o.name||'')}: ${vals[i]}${o.unit||''}${o.extra?'<br>'+esc(o.extra[i]||''):''}`)});
+  hit.addEventListener('mouseleave',()=>{cr.setAttribute('opacity',0);dot.setAttribute('opacity',0);hideTip()});
+}
+function barChart(host,data){
+  if(!data.length){host.innerHTML='<div class="empty">No chapter test results yet.</div>';return}
+  const W=560,H=240,m={l:34,r:8,t:12,b:80},s=svgBox(host,W,H),y=v=>m.t+(1-v/100)*(H-m.t-m.b);
+  [0,25,50,75,100].forEach(v=>{el('line',{x1:m.l,x2:W-m.r,y1:y(v),y2:y(v),stroke:css('--grid')},s);el('text',{x:m.l-6,y:y(v)+4,'text-anchor':'end'},s).textContent=v+'%'});
+  const bw=(W-m.l-m.r)/data.length;
+  data.forEach((d,i)=>{const x0=m.l+i*bw+2,w=Math.max(6,Math.min(46,bw-4)),xx=x0+(bw-4-w)/2,top=y(d.v);
+    el('path',{d:`M${xx} ${y(0)} V${top+4} Q${xx} ${top} ${xx+4} ${top} H${xx+w-4} Q${xx+w} ${top} ${xx+w} ${top+4} V${y(0)} Z`,fill:css('--series')},s);
+    const t=el('text',{x:xx+w/2,y:y(0)+10,'text-anchor':'end',transform:`rotate(-40 ${xx+w/2} ${y(0)+10})`},s);t.textContent=d.c.length>22?d.c.slice(0,21)+'…':d.c;
+    const hit=el('rect',{x:m.l+i*bw,y:m.t,width:bw,height:H-m.t-m.b,fill:'transparent'},s);hit.addEventListener('mousemove',e=>showTip(e,`<b>${esc(d.c)}</b><br>Average ${d.v}% · ${d.n} attempt${d.n===1?'':'s'}`));hit.addEventListener('mouseleave',hideTip)});
+  el('line',{x1:m.l,x2:W-m.r,y1:y(50),y2:y(50),stroke:css('--muted'),'stroke-dasharray':'4 4'},s);
+}
+function hbar(host,rows,unit){
+  if(!rows.length){host.innerHTML='<div class="empty">Nothing to show yet.</div>';return}
+  const W=560,rh=30,m={l:190,r:48,t:4},s=svgBox(host,W,m.t+rows.length*rh),mx=Math.max(...rows.map(r=>r.v),1),x=v=>m.l+v/mx*(W-m.l-m.r);
+  rows.forEach((d,i)=>{const yy=m.t+i*rh;const lab=d.label.length>30?d.label.slice(0,29)+'…':d.label;el('text',{x:m.l-8,y:yy+18,'text-anchor':'end',style:'fill:var(--text)'},s).textContent=lab;
+    el('rect',{x:m.l,y:yy+8,width:W-m.l-m.r,height:12,rx:4,fill:css('--grid')},s);el('rect',{x:m.l,y:yy+8,width:Math.max(4,x(d.v)-m.l),height:12,rx:4,fill:css('--series')},s);
+    el('text',{x:x(d.v)+6,y:yy+18,style:'fill:var(--text);font-weight:600'},s).textContent=d.v+(unit||'');
+    const hit=el('rect',{x:0,y:yy,width:W,height:rh,fill:'transparent'},s);hit.addEventListener('mousemove',e=>showTip(e,`<b>${esc(d.label)}</b><br>${esc(d.tip||d.v+(unit||''))}`));hit.addEventListener('mouseleave',hideTip)});
+}
+function masteryChart(host,legend){
+  const cols=['--seq1','--seq2','--seq3','--seq4'].map(css),latest=new Map(),ids=idset();
+  S.mastery.filter(m=>ids.has(m.user_id)&&(S.paper==='ALL'||m.paper_code===S.paper)).sort((a,b)=>a.t-b.t).forEach(m=>latest.set(m.user_id+'|'+m.paper_code+'|'+m.topic_id,{p:m.paper_code,l:lvl(m.data?.level??m.data?.to)}));
+  const by={};latest.forEach(v=>{(by[v.p]=by[v.p]||[0,0,0,0])[v.l]++});const ps=Object.keys(by).sort();
+  if(!ps.length){host.innerHTML='<div class="empty">No topic progress uploaded yet.</div>';legend.innerHTML='';return}
+  const W=360,rh=46,m={l:34,r:6,t:4},s=svgBox(host,W,m.t+ps.length*rh);
+  ps.forEach((p,i)=>{const yy=m.t+i*rh,tot=by[p].reduce((a,b)=>a+b,0)||1;el('text',{x:0,y:yy+22,style:'fill:var(--text);font-weight:700'},s).textContent=p;let x0=m.l;const full=W-m.l-m.r;
+    by[p].forEach((v,k)=>{if(!v)return;const w=v/tot*full-2;el('rect',{x:x0,y:yy+8,width:Math.max(2,w),height:22,rx:4,fill:cols[k]},s);const h=el('rect',{x:x0,y:yy+4,width:Math.max(2,w)+2,height:30,fill:'transparent'},s);h.addEventListener('mousemove',e=>showTip(e,`<b>${esc(p)} · ${LEVELS[k]}</b><br>${v} topic record${v===1?'':'s'} (${Math.round(100*v/tot)}%)`));h.addEventListener('mouseleave',hideTip);x0+=w+2})});
+  legend.innerHTML=LEVELS.map((l,k)=>`<span><i style="background:${cols[k]}"></i>${l}</span>`).join('');
+}
+function spark(v){if(v.length<2)return '';const W=80,H=22,mn=Math.min(...v),mx=Math.max(...v);return `<svg viewBox="0 0 ${W} ${H}" style="width:80px;height:22px"><polyline points="${v.map((x,i)=>`${i*W/(v.length-1)},${H-2-(x-mn)/(mx-mn||1)*(H-4)}`).join(' ')}" fill="none" stroke="var(--series)" stroke-width="2"/></svg>`}
+
+/* ---------- views ---------- */
+function weeks(n){const out=[];const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-((d.getDay()+6)%7));for(let i=n-1;i>=0;i--)out.push(+d-i*7*DAY);return out}
+function weekSeries(n,fn){const w=weeks(n);return{labels:w.map(fmtD),vals:w.map(t=>fn(t,t+7*DAY))}}
+function renderOverview(){
+  const ids=idset(),pf=x=>ids.has(x.user_id)&&(S.paper==='ALL'||x.paper_code===S.paper);
+  const A=S.attempts.filter(pf),M=S.mistakes.filter(pf),E=S.mastery.filter(pf);
+  const cur=A.filter(a=>inRange(a.t,S.range)),prev=A.filter(a=>inRange(a.t,S.range,S.range));
+  const cs=avg(cur.map(a=>a.pct).filter(v=>v!=null)),ps=avg(prev.map(a=>a.pct).filter(v=>v!=null));
+  const act=new Set([...A,...M,...E].filter(x=>inRange(x.t,7)).map(x=>x.user_id)).size;
+  const vs=visibleStudents(),onb=vs.filter(s=>s.onboarding_completed_at).length;
+  const dl=(c,p,u='')=>c==null||p==null?'':`<span class="${c>=p?'up':'down'}">${c>=p?'▲':'▼'}</span> ${c>=p?'+':''}${c-p}${u} vs previous period`;
+  const stats=[['Students',vs.length,`${onb} finished the questionnaire`],['Active in last 7 days',act,'studied at least once'],['Tests completed',cur.length,prev.length||cur.length?dl(cur.length,prev.length):''],['Average score',cs==null?'—':cs+'%',dl(cs,ps,' pts')||'chapter tests and mocks']];
+  $('stats').innerHTML=stats.map(s=>`<div class="card stat"><div class="label">${s[0]}</div><div class="val">${s[1]}</div><div class="delta">${s[2]}</div></div>`).join('');
+  const nw=S.range>=90?13:8;
+  const sg=weekSeries(nw,(a,b)=>vs.filter(s=>{const t=+new Date(s.created_at);return t>=a&&t<b}).length);
+  const cum=[];let run=vs.filter(s=>+new Date(s.created_at)<weeks(nw)[0]).length;sg.vals.forEach(v=>{run+=v;cum.push(run)});
+  lineChart($('chart-signups'),cum,sg.labels,{name:'Total students',every:nw>8?2:1,extra:sg.vals.map(v=>'+'+v+' new')});
+  const ag=weekSeries(nw,(a,b)=>new Set([...A,...M,...E].filter(x=>x.t>=a&&x.t<b).map(x=>x.user_id)).size);
+  lineChart($('chart-active'),ag.vals,ag.labels,{name:'Active students',every:nw>8?2:1});
+  masteryChart($('chart-mastery'),$('mastery-legend'));
+  const pp=S.paper==='ALL'?(papers()[0]||null):S.paper,ch={};
+  A.filter(a=>a.kind==='chapter'&&a.pct!=null&&(!pp||a.paper_code===pp)).forEach(a=>{const k=a.data?.chapter_title||a.chapter_id||'Chapter';(ch[k]=ch[k]||[]).push(a.pct)});
+  $('chapter-hint').textContent=(pp?pp+' chapter tests':'Chapter tests')+' · dashed line = 50% pass mark'+(S.paper==='ALL'&&papers().length>1?' · choose a paper above':'');
+  barChart($('chart-chapters'),Object.entries(ch).map(([c,v])=>({c,v:avg(v),n:v.length})));
+  const tm={};M.filter(m=>inRange(m.t,S.range)||true).forEach(m=>{const k=m.paper_code+' · '+(m.data?.topic_title||m.topic_id||'Unknown topic');(tm[k]=tm[k]||{n:0,u:new Set()});tm[k].n++;tm[k].u.add(m.user_id)});
+  hbar($('chart-weak'),Object.entries(tm).sort((a,b)=>b[1].n-a[1].n).slice(0,8).map(([k,v])=>({label:k,v:v.n,tip:`${v.n} mistakes by ${v.u.size} student${v.u.size===1?'':'s'}`})));
+  const q={};M.forEach(m=>{const id=m.data?.question_id||m.data?.question_text;if(!id)return;const o=q[id]=q[id]||{p:m.paper_code,topic:m.data?.topic_title||m.topic_id||'',text:m.data?.question_text||String(id),n:0,u:new Set()};o.n++;o.u.add(m.user_id)});
+  const qs=Object.values(q).sort((a,b)=>b.n-a.n).slice(0,10);
+  $('missed').innerHTML=qs.length?'<tr><th>Paper</th><th>Topic</th><th>Question</th><th class="num">Times missed</th><th class="num">Students</th></tr>'+qs.map(r=>`<tr><td><span class="tag">${esc(r.p)}</span></td><td>${esc(r.topic)}</td><td>${esc(r.text.length>110?r.text.slice(0,109)+'…':r.text)}</td><td class="num">${r.n}</td><td class="num">${r.u.size}</td></tr>`).join(''):'<tr><td class="empty">No mistakes uploaded yet.</td></tr>';
+  const cnt=(f)=>{const c={};vs.forEach(s=>{const v=f(s);(Array.isArray(v)?v:[v]).filter(Boolean).forEach(k=>c[k]=(c[k]||0)+1)});return Object.entries(c).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([label,v])=>({label,v}))};
+  hbar($('chart-mode'),cnt(s=>s.study_mode));hbar($('chart-ref'),cnt(s=>s.referral_source));
+  $('nodata').classList.toggle('hidden',!!(S.attempts.length||S.mistakes.length||S.mastery.length));
+}
+function studentRows(){
+  const ids=idset();return visibleStudents().map(s=>{const a=S.attempts.filter(x=>x.user_id===s.user_id).sort((x,y)=>x.t-y.t);const pcts=a.map(x=>x.pct).filter(v=>v!=null);const k=S.streaks.filter(x=>x.user_id===s.user_id).reduce((m,x)=>Math.max(m,x.current_streak||0),0);
+    return{s,tests:a.length,avg:avg(pcts),trend:pcts.slice(-8),streak:k,last:lastActive(s.user_id),mistakes:S.mistakes.filter(x=>x.user_id===s.user_id).length}}).sort((a,b)=>b.last-a.last||a.s.name.localeCompare(b.s.name));
+}
+function renderStudents(){
+  const rows=studentRows();
+  $('students').innerHTML=rows.length?'<tr><th>Student</th><th>Group</th><th>Subjects</th><th class="num">Tests</th><th class="num">Avg score</th><th>Trend</th><th class="num">Streak</th><th>Last active</th><th>Exam</th></tr>'+rows.map(r=>`<tr class="click" data-id="${esc(r.s.user_id)}"><td><b>${esc(r.s.name)}</b></td><td>${esc(r.s.group)}</td><td>${esc([].concat(r.s.subjects_interested||[]).join(', '))}</td><td class="num">${r.tests}</td><td class="num">${r.avg==null?'—':r.avg+'%'}</td><td>${spark(r.trend)}</td><td class="num">${r.streak?r.streak+' d':'—'}</td><td>${ago(r.last)}</td><td>${r.s.planned_exam_date?esc(r.s.planned_exam_date):'—'}</td></tr>`).join(''):'<tr><td class="empty">No students match this filter.</td></tr>';
+  document.querySelectorAll('#students tr.click').forEach(tr=>tr.onclick=()=>{S.current=tr.dataset.id;select('detail')});
+}
+function renderDetail(){
+  const vs=visibleStudents();if(!S.current||!S.byId[S.current])S.current=vs[0]?.user_id;const s=S.byId[S.current];
+  if(!s){$('detail-head').innerHTML='<div class="empty">No students yet.</div>';return}
+  const A=S.attempts.filter(x=>x.user_id===s.user_id).sort((a,b)=>a.t-b.t),M=S.mistakes.filter(x=>x.user_id===s.user_id).sort((a,b)=>b.t-a.t),pcts=A.filter(a=>a.pct!=null);
+  const streak=S.streaks.filter(x=>x.user_id===s.user_id).reduce((m,x)=>Math.max(m,x.current_streak||0),0);
+  $('detail-head').innerHTML=`<div class="profile"><div class="avatar">${esc(s.name[0]||'?')}</div><div style="flex:1;min-width:200px"><h3 style="font-size:18px">${esc(s.name)}</h3><div class="note">${esc(s.group)} · ${esc(s.study_mode||'')} ${s.student_status?'· '+esc(s.student_status):''}${s.planned_exam_date?' · exam '+esc(s.planned_exam_date):''}</div>${s.email||s.phone?`<div class="note">${esc([s.email,s.phone].filter(Boolean).join(' · '))}</div>`:''}</div>
+  <div class="kv"><b>Tests taken</b><span>${A.length}</span><b>Average score</b><span>${avg(pcts.map(a=>a.pct))==null?'—':avg(pcts.map(a=>a.pct))+'%'}</span><b>Study streak</b><span>${streak?streak+' days':'—'}</span><b>Last active</b><span>${ago(lastActive(s.user_id))}</span></div>
+  <select id="pick" aria-label="Choose student">${vs.map(x=>`<option value="${esc(x.user_id)}" ${x.user_id===s.user_id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div>`;
+  $('pick').onchange=e=>{S.current=e.target.value;renderDetail()};
+  lineChart($('chart-trend'),pcts.map(a=>a.pct),pcts.map(a=>fmtD(a.t)),{name:'Score',unit:'%',max:100,ref:50,every:Math.ceil(pcts.length/8)||1,extra:pcts.map(a=>(a.kind==='mock'?'Mock exam':'Chapter test')+' · '+a.paper_code)});
+  const tm={};M.forEach(m=>{const k=m.paper_code+' · '+(m.data?.topic_title||m.topic_id||'Unknown topic');tm[k]=(tm[k]||0)+1});
+  hbar($('chart-sweak'),Object.entries(tm).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([label,v])=>({label,v,tip:v+' mistakes'})));
+  $('recent').innerHTML=A.length?'<tr><th>Date</th><th>Test</th><th class="num">Score</th></tr>'+A.slice().reverse().slice(0,8).map(a=>`<tr><td>${fmtD(a.t)}</td><td>${esc(a.paper_code)} · ${a.kind==='mock'?'Mock exam':esc(a.data?.chapter_title||a.chapter_id||'Chapter test')}</td><td class="num">${a.score??'—'}/${a.total_marks??'—'}${a.pct!=null?' ('+a.pct+'%)':''}</td></tr>`).join(''):'<tr><td class="empty">No tests uploaded yet.</td></tr>';
+  $('smistakes').innerHTML=M.length?'<tr><th>Topic</th><th>Their answer</th><th>Correct</th></tr>'+M.slice(0,8).map(m=>`<tr><td><span class="tag">${esc(m.paper_code)}</span>${esc(m.data?.topic_title||m.topic_id||'')}</td><td>${esc(m.data?.chosen??m.data?.your_answer??'—')}</td><td>${esc(m.data?.correct??m.data?.correct_answer??'—')}</td></tr>`).join(''):'<tr><td class="empty">No mistakes uploaded yet.</td></tr>';
+}
+function renderTeam(){
+  const owner=S.role==='owner';
+  $('team').innerHTML='<tr><th>Email</th><th>Role</th><th>Organisation</th><th>Can see</th><th></th></tr>'+S.team.map(t=>`<tr><td>${esc(t.email)}</td><td><span class="${t.role==='owner'?'pill':'tag'}">${t.role==='owner'?'Owner':'Admin'}</span></td><td>${esc(t.organisation||'')}</td><td>${t.role==='owner'?'Everything; manages who has access':'Student names, contact details, profiles and progress (read-only)'}</td><td>${owner&&t.role!=='owner'?`<button class="btn small" data-rm="${esc(t.email)}">Remove</button>`:''}</td></tr>`).join('');
+  document.querySelectorAll('[data-rm]').forEach(b=>b.onclick=async()=>{if(!confirm('Remove '+b.dataset.rm+' from the dashboard?'))return;const {error}=await sb.from('admin_users').delete().eq('email',b.dataset.rm);if(error)return alert(error.message);S.team=S.team.filter(t=>t.email!==b.dataset.rm);renderTeam()});
+  $('addbox').classList.toggle('hidden',!owner);
+}
+function exportCsv(){
+  const safe=v=>{v=String(v??'');if(/^[=+\-@\t\r]/.test(v))v="'"+v;return '"'+v.replace(/"/g,'""')+'"'};
+  const hdr=['Name','Group','Subjects','Exam date','Tests','Average score %','Mistakes','Streak days','Last active','Email','Phone'];
+  const lines=[hdr.map(safe).join(',')].concat(studentRows().map(r=>[r.s.name,r.s.group,[].concat(r.s.subjects_interested||[]).join('; '),r.s.planned_exam_date||'',r.tests,r.avg??'',r.mistakes,r.streak,r.last?new Date(r.last).toISOString().slice(0,10):''].concat([r.s.email||'',r.s.phone||'']).map(safe).join(',')));
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([lines.join('\n')],{type:'text/csv'}));a.download='metirion-students-'+new Date().toISOString().slice(0,10)+'.csv';a.click();URL.revokeObjectURL(a.href);
+}
+function select(t){S.tab=t;document.querySelectorAll('.tab').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===t));['overview','students','detail','team'].forEach(x=>$('tab-'+x).classList.toggle('hidden',x!==t));$('filters').style.display=t==='team'?'none':'flex';({overview:renderOverview,students:renderStudents,detail:renderDetail,team:renderTeam})[t]()}
+function shell(){
+  $('who').innerHTML=`${esc(S.email)} <span class="pill">${S.role==='owner'?'Owner':'Admin'}</span> <button class="btn small" id="so">Sign out</button>`;$('so').onclick=signOut;
+  const groups=[...new Set(S.students.map(s=>s.group))].sort(),ps=papers();
+  $('app').innerHTML=`<div class="tabs" role="tablist"><button class="tab" data-tab="overview">Overview</button><button class="tab" data-tab="students">Students</button><button class="tab" data-tab="detail">Student detail</button><button class="tab" data-tab="team">Team &amp; access</button></div>
+  <div class="filters" id="filters"><div class="seg" id="range">${[7,30,90].map(d=>`<button data-r="${d}" aria-pressed="${d===S.range}">${d} days</button>`).join('')}</div>
+  <select id="paper" aria-label="Paper"><option value="ALL">All papers</option>${['BT','MA','FA'].concat(ps.filter(p=>!['BT','MA','FA'].includes(p))).map(p=>`<option>${esc(p)}</option>`).join('')}</select>
+  <select id="group" aria-label="Group"><option value="ALL">All students</option>${groups.map(g=>`<option>${esc(g)}</option>`).join('')}</select>
+  <button class="btn" id="csv" style="margin-left:auto">Export CSV</button><button class="btn" id="refresh">Refresh</button></div>
+  <section id="tab-overview"><div class="banner hidden" id="nodata"><b>No study activity yet.</b> Charts below fill in once students use the version of the app that uploads progress. Sign-up information is already live.</div>
+   <div class="grid g4" id="stats"></div>
+   <div class="grid g2" style="margin-top:14px"><div class="card"><h3>Students over time</h3><p class="hint">Total students who have signed up, by week</p><div id="chart-signups"></div></div>
+    <div class="card"><h3>Active students per week</h3><p class="hint">Students who studied at least once that week</p><div id="chart-active"></div></div></div>
+   <div class="grid g32" style="margin-top:14px"><div class="card"><h3>Average score by chapter</h3><p class="hint" id="chapter-hint"></p><div id="chart-chapters"></div></div>
+    <div class="card"><h3>Topic mastery by paper</h3><p class="hint">Latest level per topic, all students</p><div id="chart-mastery"></div><div class="legend" id="mastery-legend"></div></div></div>
+   <div class="grid g2" style="margin-top:14px"><div class="card"><h3>Topics with most mistakes</h3><p class="hint">Number of wrong answers logged</p><div id="chart-weak"></div></div>
+    <div class="card"><h3>Most-missed questions</h3><p class="hint">Useful for teaching</p><div class="tablewrap"><table id="missed"></table></div></div></div>
+   <div class="grid g2" style="margin-top:14px"><div class="card"><h3>Study mode</h3><div id="chart-mode"></div></div><div class="card"><h3>How students heard about Metirion</h3><div id="chart-ref"></div></div></div></section>
+  <section id="tab-students" class="hidden"><div class="card"><h3>All students</h3><p class="hint">Select a student to see their full progress</p><div class="tablewrap"><table id="students"></table></div></div></section>
+  <section id="tab-detail" class="hidden"><div class="card" id="detail-head"></div><div class="grid g2" style="margin-top:14px"><div class="card"><h3>Score trend</h3><p class="hint">Every test, oldest to newest · dashed line = 50%</p><div id="chart-trend"></div></div><div class="card"><h3>Topics with most mistakes</h3><div id="chart-sweak"></div></div></div>
+   <div class="grid g2" style="margin-top:14px"><div class="card"><h3>Recent tests</h3><div class="tablewrap"><table id="recent"></table></div></div><div class="card"><h3>Recent mistakes</h3><div class="tablewrap"><table id="smistakes"></table></div></div></div></section>
+  <section id="tab-team" class="hidden"><div class="card"><h3>Who can see this dashboard</h3><p class="hint">Everyone signs in with their own email link. Access is enforced by the database, not just this page.</p><div class="tablewrap"><table id="team"></table></div>
+   <form id="addbox" class="hidden" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap"><input type="email" id="ae" placeholder="new admin email" required><input type="text" id="ao" placeholder="Organisation (e.g. Klarion)"><button class="btn gold" type="submit">Add admin</button><span class="note" id="am"></span></form></div></section>`;
+  $('range').querySelectorAll('button').forEach(b=>b.onclick=()=>{S.range=+b.dataset.r;$('range').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b));select(S.tab)});
+  $('paper').onchange=e=>{S.paper=e.target.value;select(S.tab)};$('group').onchange=e=>{S.group=e.target.value;select(S.tab)};
+  document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>select(b.dataset.tab));$('csv').onclick=exportCsv;
+  $('refresh').onclick=async()=>{$('refresh').textContent='Refreshing…';await loadAll();shell();select(S.tab)};
+  $('addbox').onsubmit=async e=>{e.preventDefault();const email=$('ae').value.trim().toLowerCase();const {error}=await sb.from('admin_users').insert({email,role:'admin',organisation:$('ao').value.trim()||null});
+    if(error){$('am').textContent=error.message;return}const {data}=await sb.from('admin_users').select('*').order('role');S.team=data||[];renderTeam();$('ae').value='';$('ao').value='';$('am').textContent='Added.'};
+  select(S.tab);
+}
+async function start(){
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session)return loginView();
+  S.email=(session.user.email||'').toLowerCase();
+  const adm=await sb.rpc('is_admin');if(adm.error||!adm.data)return noAccess(S.email);
+  const own=await sb.rpc('is_owner');S.role=own.data?'owner':'admin';
+  try{await loadAll()}catch(e){$('app').innerHTML=`<div class="card login"><h2>Couldn't load data</h2><p class="err">${esc(e.message||e)}</p><button class="btn" onclick="location.reload()">Try again</button></div>`;return}
+  if(location.hash)history.replaceState(null,'',location.pathname);
+  shell();
+}
+sb.auth.onAuthStateChange((ev)=>{if(ev==='SIGNED_OUT')loginView()});
+start();
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(S.role)select(S.tab)});
+</script>
+</body>
+</html>
