@@ -221,7 +221,7 @@ function renderDetail(){
 }
 function renderTeam(){
   const owner=S.role==='owner';
-  $('team').innerHTML='<tr><th>Email</th><th>Role</th><th>Organisation</th><th>Can see</th><th></th></tr>'+S.team.map(t=>`<tr><td>${esc(t.email)}</td><td><span class="${t.role==='owner'?'pill':'tag'}">${t.role==='owner'?'Owner':'Admin'}</span></td><td>${esc(t.organisation||'')}</td><td>${t.role==='owner'?'Everything; manages who has access':'Student names, contact details, profiles and progress (read-only)'}</td><td>${owner&&t.role!=='owner'?`<button class="btn small" data-rm="${esc(t.email)}">Remove</button>`:''}</td></tr>`).join('');
+  $('team').innerHTML='<tr><th>Email</th><th>Role</th><th>Organisation</th><th>Can see</th><th></th></tr>'+S.team.map(t=>`<tr><td>${esc(t.email)}</td><td><span class="tag">Administrator</span></td><td>${esc(t.organisation||'')}</td><td>${t.role==='owner'?'Everything, and manages dashboard access':'Student names, contact details, profiles and progress (read-only)'}</td><td>${owner&&t.role!=='owner'?`<button class="btn small" data-rm="${esc(t.email)}">Remove</button>`:''}</td></tr>`).join('');
   document.querySelectorAll('[data-rm]').forEach(b=>b.onclick=async()=>{if(!confirm('Remove '+b.dataset.rm+' from the dashboard?'))return;const {error}=await sb.from('admin_users').delete().eq('email',b.dataset.rm);if(error)return alert(error.message);S.team=S.team.filter(t=>t.email!==b.dataset.rm);renderTeam()});
   $('addbox').classList.toggle('hidden',!owner);
 }
@@ -233,7 +233,7 @@ function exportCsv(){
 }
 function select(t){S.tab=t;document.querySelectorAll('.tab').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===t));['overview','students','detail','team'].forEach(x=>$('tab-'+x).classList.toggle('hidden',x!==t));$('filters').style.display=t==='team'?'none':'flex';({overview:renderOverview,students:renderStudents,detail:renderDetail,team:renderTeam})[t]()}
 function shell(){
-  $('who').innerHTML=`${esc(S.email)} <span class="pill">${S.role==='owner'?'Owner':'Admin'}</span> <button class="btn small" id="so">Sign out</button>`;$('so').onclick=signOut;
+  $('who').innerHTML=`${esc(S.email)} <span class="pill">Admin</span> <button class="btn small" id="so">Sign out</button>`;$('so').onclick=signOut;
   const groups=[...new Set(S.students.map(s=>s.group))].sort(),ps=papers();
   $('app').innerHTML=`<div class="tabs" role="tablist"><button class="tab" data-tab="overview">Overview</button><button class="tab" data-tab="students">Students</button><button class="tab" data-tab="detail">Student detail</button><button class="tab" data-tab="team">Team &amp; access</button></div>
   <div class="filters" id="filters"><div class="seg" id="range">${[7,30,90].map(d=>`<button data-r="${d}" aria-pressed="${d===S.range}">${d} days</button>`).join('')}</div>
