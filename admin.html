@@ -68,7 +68,8 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const DAY=864e5;
 const LEVELS=['Not studied','Learning','Reviewed','Mastered'];
 const lvl=v=>{v=String(v??'').toLowerCase().replace(/[_-]/g,' ').trim();return v.startsWith('master')?3:v.startsWith('review')?2:v.startsWith('learn')?1:0};
-const S={role:null,email:null,students:[],attempts:[],mistakes:[],mastery:[],streaks:[],team:[],range:30,paper:'ALL',group:'ALL',tab:'overview',current:null};
+const isOwner=()=>S.role==='owner'&&!S.preview;
+const S={preview:false,role:null,email:null,students:[],attempts:[],mistakes:[],mastery:[],streaks:[],team:[],range:30,paper:'ALL',group:'ALL',tab:'overview',current:null};
 
 /* ---------- auth ---------- */
 function loginView(msg,cls){
@@ -220,8 +221,8 @@ function renderDetail(){
   $('smistakes').innerHTML=M.length?'<tr><th>Topic</th><th>Their answer</th><th>Correct</th></tr>'+M.slice(0,8).map(m=>`<tr><td><span class="tag">${esc(m.paper_code)}</span>${esc(m.data?.topic_title||m.topic_id||'')}</td><td>${esc(m.data?.chosen??m.data?.your_answer??'—')}</td><td>${esc(m.data?.correct??m.data?.correct_answer??'—')}</td></tr>`).join(''):'<tr><td class="empty">No mistakes uploaded yet.</td></tr>';
 }
 function renderTeam(){
-  const owner=S.role==='owner';
-  $('team').innerHTML='<tr><th>Email</th><th>Role</th><th>Organisation</th><th>Can see</th><th></th></tr>'+S.team.map(t=>`<tr><td>${esc(t.email)}</td><td><span class="tag">Administrator</span></td><td>${esc(t.organisation||'')}</td><td>${t.role==='owner'?'Everything, and manages dashboard access':'Student names, contact details, profiles and progress (read-only)'}</td><td>${owner&&t.role!=='owner'?`<button class="btn small" data-rm="${esc(t.email)}">Remove</button>`:''}</td></tr>`).join('');
+  const owner=isOwner();
+  $('team').innerHTML='<tr><th>Email</th><th>Role</th><th>Organisation</th><th></th></tr>'+S.team.map(t=>`<tr><td>${esc(t.email)}</td><td><span class="tag">Administrator</span></td><td>${esc(t.organisation||'')}</td><td>${owner&&t.role!=='owner'?`<button class="btn small" data-rm="${esc(t.email)}">Remove</button>`:''}</td></tr>`).join('');
   document.querySelectorAll('[data-rm]').forEach(b=>b.onclick=async()=>{if(!confirm('Remove '+b.dataset.rm+' from the dashboard?'))return;const {error}=await sb.from('admin_users').delete().eq('email',b.dataset.rm);if(error)return alert(error.message);S.team=S.team.filter(t=>t.email!==b.dataset.rm);renderTeam()});
   $('addbox').classList.toggle('hidden',!owner);
 }
@@ -231,11 +232,12 @@ function exportCsv(){
   const lines=[hdr.map(safe).join(',')].concat(studentRows().map(r=>[r.s.name,r.s.group,[].concat(r.s.subjects_interested||[]).join('; '),r.s.planned_exam_date||'',r.tests,r.avg??'',r.mistakes,r.streak,r.last?new Date(r.last).toISOString().slice(0,10):''].concat([r.s.email||'',r.s.phone||'']).map(safe).join(',')));
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([lines.join('\n')],{type:'text/csv'}));a.download='metirion-students-'+new Date().toISOString().slice(0,10)+'.csv';a.click();URL.revokeObjectURL(a.href);
 }
-function select(t){S.tab=t;document.querySelectorAll('.tab').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===t));['overview','students','detail','team'].forEach(x=>$('tab-'+x).classList.toggle('hidden',x!==t));$('filters').style.display=t==='team'?'none':'flex';({overview:renderOverview,students:renderStudents,detail:renderDetail,team:renderTeam})[t]()}
+function select(t){if(t==='team'&&!isOwner())t='overview';S.tab=t;document.querySelectorAll('.tab').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===t));['overview','students','detail','team'].forEach(x=>$('tab-'+x).classList.toggle('hidden',x!==t));$('filters').style.display=t==='team'?'none':'flex';({overview:renderOverview,students:renderStudents,detail:renderDetail,team:renderTeam})[t]()}
 function shell(){
-  $('who').innerHTML=`${esc(S.email)} <span class="pill">Admin</span> <button class="btn small" id="so">Sign out</button>`;$('so').onclick=signOut;
+  $('who').innerHTML=`${esc(S.preview?'Klarion admin (preview)':S.email)} <span class="pill">Admin</span> ${S.role==='owner'?`<button class="btn small" id="pv">${S.preview?'Exit preview':'View as Klarion admin'}</button>`:''} <button class="btn small" id="so">Sign out</button>`;$('so').onclick=signOut;
+  if($('pv'))$('pv').onclick=()=>{S.preview=!S.preview;shell()};
   const groups=[...new Set(S.students.map(s=>s.group))].sort(),ps=papers();
-  $('app').innerHTML=`<div class="tabs" role="tablist"><button class="tab" data-tab="overview">Overview</button><button class="tab" data-tab="students">Students</button><button class="tab" data-tab="detail">Student detail</button><button class="tab" data-tab="team">Team &amp; access</button></div>
+  $('app').innerHTML=`${S.preview?'<div class="banner"><b>Preview mode.</b> This is exactly what a Klarion admin sees. Use <b>Exit preview</b> at the top to go back.</div>':''}<div class="tabs" role="tablist"><button class="tab" data-tab="overview">Overview</button><button class="tab" data-tab="students">Students</button><button class="tab" data-tab="detail">Student detail</button>${isOwner()?'<button class="tab" data-tab="team">Team &amp; access</button>':''}</div>
   <div class="filters" id="filters"><div class="seg" id="range">${[7,30,90].map(d=>`<button data-r="${d}" aria-pressed="${d===S.range}">${d} days</button>`).join('')}</div>
   <select id="paper" aria-label="Paper"><option value="ALL">All papers</option>${['BT','MA','FA'].concat(ps.filter(p=>!['BT','MA','FA'].includes(p))).map(p=>`<option>${esc(p)}</option>`).join('')}</select>
   <select id="group" aria-label="Group"><option value="ALL">All students</option>${groups.map(g=>`<option>${esc(g)}</option>`).join('')}</select>
