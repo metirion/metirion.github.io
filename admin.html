@@ -43,7 +43,7 @@ tr.click{cursor:pointer}tr.click:hover td{background:color-mix(in srgb,#E4C58B 1
 .btn{font:inherit;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:10px;padding:7px 14px;cursor:pointer}
 .btn.gold{background:#E4C58B;color:#263447;border-color:#E4C58B;font-weight:700}.btn.small{padding:3px 10px;font-size:12px}
 .profile{display:flex;gap:14px;align-items:center;flex-wrap:wrap}.avatar{width:48px;height:48px;border-radius:50%;background:#E4C58B;color:#263447;display:grid;place-items:center;font-weight:800;font-size:18px}
-.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px}.kv b{color:var(--text2);font-weight:600}
+.kv{display:grid;grid-template-columns:auto auto auto auto;gap:4px 14px;font-size:13px}.kv b{color:var(--text2);font-weight:600}
 .login{max-width:420px;margin:60px auto;text-align:center}.login h2{margin:0 0 6px}.login p{color:var(--text2)}.login form{display:flex;gap:8px;margin-top:14px}.login input{flex:1}
 .err{color:var(--down);font-size:13px;margin-top:10px}.ok{color:var(--up);font-size:13px;margin-top:10px}
 .bar-cell{display:flex;align-items:center;gap:8px;justify-content:flex-end}.bar-cell .b{height:8px;border-radius:4px;background:var(--series);display:inline-block}
@@ -100,13 +100,15 @@ async function loadAll(){
     sb.from('admin_users').select('*').order('role').then(r=>r.data||[])]);
   S.students=st;S.attempts=at.map(a=>({...a,t:+new Date(a.completed_at),pct:a.total_marks>0?Math.round(100*a.score/a.total_marks):null}));
   S.mistakes=mi.map(m=>({...m,t:+new Date(m.created_at)}));S.mastery=ma.map(m=>({...m,t:+new Date(m.created_at)}));S.streaks=sk;S.team=tm;
-  const byId={};S.students.forEach(s=>{s.name=(s.full_name||[s.first_name,s.last_name].filter(Boolean).join(' ')||'Student '+String(s.user_id).slice(0,4)).trim();s.group=s.is_mahe_student?'MAHE':(s.coaching_center_name||s.institution||'Self-study / other');byId[s.user_id]=s});S.byId=byId;
+  const byId={};S.students.forEach(s=>{s.name=(s.full_name||[s.first_name,s.last_name].filter(Boolean).join(' ')||'Student '+String(s.user_id).slice(0,4)).trim();s.group=s.is_mahe_student?'MAHE':(s.coaching_center_name||s.institution||'Self-study / other');byId[s.user_id]=s});S.byId=byId;S.act={};for(const l of [S.attempts,S.mistakes,S.mastery])for(const x of l)(S.act[x.user_id]=S.act[x.user_id]||[]).push(x.t);
 }
 const inRange=(t,days,offset=0)=>t>=Date.now()-(days+offset)*DAY&&t<Date.now()-offset*DAY;
 function visibleStudents(){return S.students.filter(s=>S.group==='ALL'||s.group===S.group)}
 function idset(){return new Set(visibleStudents().map(s=>s.user_id))}
 const papers=()=>[...new Set([...S.attempts,...S.mistakes,...S.mastery].map(x=>x.paper_code).filter(Boolean))].sort();
 function lastActive(uid){let t=0;for(const l of [S.attempts,S.mistakes,S.mastery])for(const x of l)if(x.user_id===uid&&x.t>t)t=x.t;for(const k of S.streaks)if(k.user_id===uid){const u=+new Date(k.updated_at);if(u>t)t=u}return t}
+const fmtDY=v=>v?new Date(v).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'}):'—';
+function actStats(uid){const ts=(S.act[uid]||[]).slice().sort((a,b)=>a-b);let sessions=0,prev=-1e15;const days=new Set();ts.forEach(t=>{if(t-prev>30*60*1000)sessions++;prev=t;days.add(new Date(t).toDateString())});return{sessions,days:days.size}}
 const ago=t=>{if(!t)return '—';const d=Math.floor((Date.now()-t)/DAY);return d<=0?'Today':d===1?'Yesterday':d+' days ago'};
 const avg=a=>a.length?Math.round(a.reduce((x,y)=>x+y,0)/a.length):null;
 const fmtD=t=>new Date(t).toLocaleDateString(undefined,{day:'numeric',month:'short'});
@@ -198,11 +200,11 @@ function renderOverview(){
 }
 function studentRows(){
   const ids=idset();return visibleStudents().map(s=>{const a=S.attempts.filter(x=>x.user_id===s.user_id).sort((x,y)=>x.t-y.t);const pcts=a.map(x=>x.pct).filter(v=>v!=null);const k=S.streaks.filter(x=>x.user_id===s.user_id).reduce((m,x)=>Math.max(m,x.current_streak||0),0);
-    return{s,tests:a.length,avg:avg(pcts),trend:pcts.slice(-8),streak:k,last:lastActive(s.user_id),mistakes:S.mistakes.filter(x=>x.user_id===s.user_id).length}}).sort((a,b)=>b.last-a.last||a.s.name.localeCompare(b.s.name));
+    const st=actStats(s.user_id);return{s,sessions:st.sessions,days:st.days,tests:a.length,avg:avg(pcts),trend:pcts.slice(-8),streak:k,last:lastActive(s.user_id),mistakes:S.mistakes.filter(x=>x.user_id===s.user_id).length}}).sort((a,b)=>b.last-a.last||a.s.name.localeCompare(b.s.name));
 }
 function renderStudents(){
   const rows=studentRows();
-  $('students').innerHTML=rows.length?'<tr><th>Student</th><th>Group</th><th>Subjects</th><th class="num">Tests</th><th class="num">Avg score</th><th>Trend</th><th class="num">Streak</th><th>Last active</th><th>Exam</th></tr>'+rows.map(r=>`<tr class="click" data-id="${esc(r.s.user_id)}"><td><b>${esc(r.s.name)}</b></td><td>${esc(r.s.group)}</td><td>${esc([].concat(r.s.subjects_interested||[]).join(', '))}</td><td class="num">${r.tests}</td><td class="num">${r.avg==null?'—':r.avg+'%'}</td><td>${spark(r.trend)}</td><td class="num">${r.streak?r.streak+' d':'—'}</td><td>${ago(r.last)}</td><td>${r.s.planned_exam_date?esc(r.s.planned_exam_date):'—'}</td></tr>`).join(''):'<tr><td class="empty">No students match this filter.</td></tr>';
+  $('students').innerHTML=rows.length?'<tr><th>Student</th><th>Group</th><th>Subjects</th><th>Joined</th><th>Form filled</th><th class="num">Sessions</th><th class="num">Tests</th><th class="num">Avg score</th><th>Trend</th><th class="num">Streak</th><th>Last active</th><th>Exam</th></tr>'+rows.map(r=>`<tr class="click" data-id="${esc(r.s.user_id)}"><td><b>${esc(r.s.name)}</b></td><td>${esc(r.s.group)}</td><td>${esc([].concat(r.s.subjects_interested||[]).join(', '))}</td><td>${fmtDY(r.s.created_at)}</td><td>${fmtDY(r.s.onboarding_completed_at)}</td><td class="num">${r.sessions}</td><td class="num">${r.tests}</td><td class="num">${r.avg==null?'—':r.avg+'%'}</td><td>${spark(r.trend)}</td><td class="num">${r.streak?r.streak+' d':'—'}</td><td>${ago(r.last)}</td><td>${r.s.planned_exam_date?esc(r.s.planned_exam_date):'—'}</td></tr>`).join(''):'<tr><td class="empty">No students match this filter.</td></tr>';
   document.querySelectorAll('#students tr.click').forEach(tr=>tr.onclick=()=>{S.current=tr.dataset.id;select('detail')});
 }
 function renderDetail(){
@@ -211,7 +213,7 @@ function renderDetail(){
   const A=S.attempts.filter(x=>x.user_id===s.user_id).sort((a,b)=>a.t-b.t),M=S.mistakes.filter(x=>x.user_id===s.user_id).sort((a,b)=>b.t-a.t),pcts=A.filter(a=>a.pct!=null);
   const streak=S.streaks.filter(x=>x.user_id===s.user_id).reduce((m,x)=>Math.max(m,x.current_streak||0),0);
   $('detail-head').innerHTML=`<div class="profile"><div class="avatar">${esc(s.name[0]||'?')}</div><div style="flex:1;min-width:200px"><h3 style="font-size:18px">${esc(s.name)}</h3><div class="note">${esc(s.group)} · ${esc(s.study_mode||'')} ${s.student_status?'· '+esc(s.student_status):''}${s.planned_exam_date?' · exam '+esc(s.planned_exam_date):''}</div>${s.email||s.phone?`<div class="note">${esc([s.email,s.phone].filter(Boolean).join(' · '))}</div>`:''}</div>
-  <div class="kv"><b>Tests taken</b><span>${A.length}</span><b>Average score</b><span>${avg(pcts.map(a=>a.pct))==null?'—':avg(pcts.map(a=>a.pct))+'%'}</span><b>Study streak</b><span>${streak?streak+' days':'—'}</span><b>Last active</b><span>${ago(lastActive(s.user_id))}</span></div>
+  <div class="kv"><b>Tests taken</b><span>${A.length}</span><b>Average score</b><span>${avg(pcts.map(a=>a.pct))==null?'—':avg(pcts.map(a=>a.pct))+'%'}</span><b>Study streak</b><span>${streak?streak+' days':'—'}</span><b>Last active</b><span>${ago(lastActive(s.user_id))}</span><b>Joined</b><span>${fmtDY(s.created_at)}</span><b>Form filled</b><span>${fmtDY(s.onboarding_completed_at)}</span><b>Total sessions</b><span>${actStats(s.user_id).sessions}</span><b>Active days</b><span>${actStats(s.user_id).days}</span></div>
   <select id="pick" aria-label="Choose student">${vs.map(x=>`<option value="${esc(x.user_id)}" ${x.user_id===s.user_id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div>`;
   $('pick').onchange=e=>{S.current=e.target.value;renderDetail()};
   lineChart($('chart-trend'),pcts.map(a=>a.pct),pcts.map(a=>fmtD(a.t)),{name:'Score',unit:'%',max:100,ref:50,every:Math.ceil(pcts.length/8)||1,extra:pcts.map(a=>(a.kind==='mock'?'Mock exam':'Chapter test')+' · '+a.paper_code)});
@@ -228,8 +230,8 @@ function renderTeam(){
 }
 function exportCsv(){
   const safe=v=>{v=String(v??'');if(/^[=+\-@\t\r]/.test(v))v="'"+v;return '"'+v.replace(/"/g,'""')+'"'};
-  const hdr=['Name','Group','Subjects','Exam date','Tests','Average score %','Mistakes','Streak days','Last active','Email','Phone'];
-  const lines=[hdr.map(safe).join(',')].concat(studentRows().map(r=>[r.s.name,r.s.group,[].concat(r.s.subjects_interested||[]).join('; '),r.s.planned_exam_date||'',r.tests,r.avg??'',r.mistakes,r.streak,r.last?new Date(r.last).toISOString().slice(0,10):''].concat([r.s.email||'',r.s.phone||'']).map(safe).join(',')));
+  const hdr=['Name','Group','Subjects','Exam date','Tests','Average score %','Mistakes','Streak days','Last active','Joined','Form filled','Sessions','Active days','Email','Phone'];
+  const lines=[hdr.map(safe).join(',')].concat(studentRows().map(r=>[r.s.name,r.s.group,[].concat(r.s.subjects_interested||[]).join('; '),r.s.planned_exam_date||'',r.tests,r.avg??'',r.mistakes,r.streak,r.last?new Date(r.last).toISOString().slice(0,10):'',r.s.created_at?String(r.s.created_at).slice(0,10):'',r.s.onboarding_completed_at?String(r.s.onboarding_completed_at).slice(0,10):'',r.sessions,r.days].concat([r.s.email||'',r.s.phone||'']).map(safe).join(',')));
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([lines.join('\n')],{type:'text/csv'}));a.download='metirion-students-'+new Date().toISOString().slice(0,10)+'.csv';a.click();URL.revokeObjectURL(a.href);
 }
 function select(t){if(t==='team'&&!isOwner())t='overview';S.tab=t;document.querySelectorAll('.tab').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===t));['overview','students','detail','team'].forEach(x=>$('tab-'+x).classList.toggle('hidden',x!==t));$('filters').style.display=t==='team'?'none':'flex';({overview:renderOverview,students:renderStudents,detail:renderDetail,team:renderTeam})[t]()}
