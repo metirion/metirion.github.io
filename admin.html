@@ -69,7 +69,7 @@ const DAY=864e5;
 const LEVELS=['Not studied','Learning','Reviewed','Mastered'];
 const lvl=v=>{v=String(v??'').toLowerCase().replace(/[_-]/g,' ').trim();return v.startsWith('master')?3:v.startsWith('review')?2:v.startsWith('learn')?1:0};
 const isOwner=()=>S.role==='owner'&&!S.preview;
-const S={preview:false,role:null,email:null,students:[],attempts:[],mistakes:[],mastery:[],streaks:[],team:[],range:30,paper:'ALL',group:'ALL',tab:'overview',current:null};
+const S={events:[],snapBy:{},topicTitle:{},preview:false,role:null,email:null,students:[],attempts:[],mistakes:[],mastery:[],streaks:[],team:[],range:30,paper:'ALL',group:'ALL',tab:'overview',current:null};
 
 /* ---------- auth ---------- */
 function loginView(msg,cls){
@@ -91,22 +91,25 @@ async function signOut(){await sb.auth.signOut();location.hash='';loginView()}
 /* ---------- data ---------- */
 async function fetchAll(table,cols){let out=[],from=0;for(;;){const {data,error}=await sb.from(table).select(cols).range(from,from+999);if(error)throw error;out=out.concat(data);if(data.length<1000)break;from+=1000}return out}
 async function loadAll(){
-  const [st,at,mi,ma,sk,tm]=await Promise.all([
+  const [st,at,mi,ma,sk,tm,sn,ev]=await Promise.all([
     fetchAll('profiles','user_id,full_name,first_name,last_name,email,phone,student_status,study_mode,coaching_center_name,institution,occupation,subjects_interested,planned_exam_date,referral_source,is_mahe_student,created_at,onboarding_completed_at'),
     fetchAll('test_attempts','id,user_id,kind,paper_code,chapter_id,score,total_marks,data,completed_at'),
     fetchAll('mistakes','id,user_id,paper_code,topic_id,data,created_at'),
     fetchAll('mastery_events','id,user_id,paper_code,topic_id,data,created_at'),
     fetchAll('streaks','user_id,streak_type,current_streak,longest_streak,last_activity_date,updated_at'),
-    sb.from('admin_users').select('*').order('role').then(r=>r.data||[])]);
+    sb.from('admin_users').select('*').order('role').then(r=>r.data||[]),
+    fetchAll('progress_snapshots','user_id,scope,data,updated_at').catch(()=>[]),
+    fetchAll('activity_events','id,user_id,event_type,paper_code,chapter_id,topic_id,attempt_id,data,occurred_at').catch(()=>[])]);
   S.students=st;S.attempts=at.map(a=>({...a,t:+new Date(a.completed_at),pct:a.total_marks>0?Math.round(100*a.score/a.total_marks):null}));
   S.mistakes=mi.map(m=>({...m,t:+new Date(m.created_at)}));S.mastery=ma.map(m=>({...m,t:+new Date(m.created_at)}));S.streaks=sk;S.team=tm;
-  const byId={};S.students.forEach(s=>{s.name=(s.full_name||[s.first_name,s.last_name].filter(Boolean).join(' ')||'Student '+String(s.user_id).slice(0,4)).trim();s.group=s.is_mahe_student?'MAHE':(s.coaching_center_name||s.institution||'Self-study / other');byId[s.user_id]=s});S.byId=byId;S.act={};for(const l of [S.attempts,S.mistakes,S.mastery])for(const x of l)(S.act[x.user_id]=S.act[x.user_id]||[]).push(x.t);
+  S.events=ev.map(e=>({...e,t:+new Date(e.occurred_at)}));S.snapBy={};S.topicTitle={};sn.forEach(r=>{(S.snapBy[r.user_id]=S.snapBy[r.user_id]||{})[r.scope]=r.data;(r.data?.topics||[]).forEach(t=>{S.topicTitle[t.topic_id]=t.title})});
+  const byId={};S.students.forEach(s=>{s.name=(s.full_name||[s.first_name,s.last_name].filter(Boolean).join(' ')||'Student '+String(s.user_id).slice(0,4)).trim();s.group=s.is_mahe_student?'MAHE':(s.coaching_center_name||s.institution||'Self-study / other');byId[s.user_id]=s});S.byId=byId;S.act={};for(const l of [S.attempts,S.mistakes,S.mastery,S.events])for(const x of l)(S.act[x.user_id]=S.act[x.user_id]||[]).push(x.t);
 }
 const inRange=(t,days,offset=0)=>t>=Date.now()-(days+offset)*DAY&&t<Date.now()-offset*DAY;
 function visibleStudents(){return S.students.filter(s=>S.group==='ALL'||s.group===S.group)}
 function idset(){return new Set(visibleStudents().map(s=>s.user_id))}
 const papers=()=>[...new Set([...S.attempts,...S.mistakes,...S.mastery].map(x=>x.paper_code).filter(Boolean))].sort();
-function lastActive(uid){let t=0;for(const l of [S.attempts,S.mistakes,S.mastery])for(const x of l)if(x.user_id===uid&&x.t>t)t=x.t;for(const k of S.streaks)if(k.user_id===uid){const u=+new Date(k.updated_at);if(u>t)t=u}return t}
+function lastActive(uid){let t=0;for(const l of [S.attempts,S.mistakes,S.mastery,S.events])for(const x of l)if(x.user_id===uid&&x.t>t)t=x.t;for(const k of S.streaks)if(k.user_id===uid){const u=+new Date(k.updated_at);if(u>t)t=u}return t}
 const fmtDY=v=>v?new Date(v).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'}):'—';
 function actStats(uid){const ts=(S.act[uid]||[]).slice().sort((a,b)=>a-b);let sessions=0,prev=-1e15;const days=new Set();ts.forEach(t=>{if(t-prev>30*60*1000)sessions++;prev=t;days.add(new Date(t).toDateString())});return{sessions,days:days.size}}
 const ago=t=>{if(!t)return '—';const d=Math.floor((Date.now()-t)/DAY);return d<=0?'Today':d===1?'Yesterday':d+' days ago'};
@@ -196,15 +199,54 @@ function renderOverview(){
   $('missed').innerHTML=qs.length?'<tr><th>Paper</th><th>Topic</th><th>Question</th><th class="num">Times missed</th><th class="num">Students</th></tr>'+qs.map(r=>`<tr><td><span class="tag">${esc(r.p)}</span></td><td>${esc(r.topic)}</td><td>${esc(r.text.length>110?r.text.slice(0,109)+'…':r.text)}</td><td class="num">${r.n}</td><td class="num">${r.u.size}</td></tr>`).join(''):'<tr><td class="empty">No mistakes uploaded yet.</td></tr>';
   const cnt=(f)=>{const c={};vs.forEach(s=>{const v=f(s);(Array.isArray(v)?v:[v]).filter(Boolean).forEach(k=>c[k]=(c[k]||0)+1)});return Object.entries(c).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([label,v])=>({label,v}))};
   hbar($('chart-mode'),cnt(s=>s.study_mode));hbar($('chart-ref'),cnt(s=>s.referral_source));
-  $('nodata').classList.toggle('hidden',!!(S.attempts.length||S.mistakes.length||S.mastery.length));
+  $('nodata').classList.toggle('hidden',!!(S.attempts.length||S.mistakes.length||S.mastery.length||S.events.length));
+  renderEngagement(ids);
+}
+
+/* ---------- engagement & progress ---------- */
+const fmtSecs=v=>v==null?'—':Math.floor(v/60)+':'+String(Math.round(v%60)).padStart(2,'0');
+const REASONS={exit:'Pressed Exit',restart:'Restarted or retook',left:'Left the screen',app_closed:'Closed the app mid-test'};
+const EVLABEL={attempt_started:'Started test',attempt_finished:'Finished test',attempt_abandoned:'Left test part-way',topic_opened:'Opened topic',flashcard_session:'Flashcard session',confidence_set:'Rated confidence'};
+const tTitle=id=>S.topicTitle[id]||id||'Topic';
+function ringSvg(cov,acc){const r1=34,r2=24,c1=2*Math.PI*r1,c2=2*Math.PI*r2;const arc=(r,c,p,col)=>`<circle cx="44" cy="44" r="${r}" fill="none" stroke="var(--grid)" stroke-width="8"/><circle cx="44" cy="44" r="${r}" fill="none" stroke="${col}" stroke-width="8" stroke-linecap="round" stroke-dasharray="${c*Math.min(100,Math.max(0,p||0))/100} ${c}" transform="rotate(-90 44 44)"/>`;return `<svg viewBox="0 0 88 88" style="width:88px;height:88px;flex:none">${arc(r1,c1,cov,'var(--seq3)')}${arc(r2,c2,acc,'var(--up)')}</svg>`}
+function renderEngagement(ids){
+  const ef=x=>ids.has(x.user_id)&&(S.paper==='ALL'||!x.paper_code||x.paper_code===S.paper)&&inRange(x.t,S.range);
+  const E=S.events.filter(ef),st=E.filter(e=>e.event_type==='attempt_started'),fi=E.filter(e=>e.event_type==='attempt_finished'),ab=E.filter(e=>e.event_type==='attempt_abandoned');
+  const answered=e=>e.data?.total_questions>0?Math.round(100*(e.data.answered||0)/e.data.total_questions):null;
+  const rate=st.length?Math.round(100*fi.length/st.length):null;
+  const stats=[['Tests started',st.length,'chapter tests and mocks'],['Finished',fi.length,rate==null?'':rate+'% of started'],['Left part-way',ab.length,avg(ab.map(answered).filter(v=>v!=null))==null?'':'on average '+avg(ab.map(answered).filter(v=>v!=null))+'% answered'],['Average time to finish',fmtSecs(avg(fi.map(e=>e.data?.seconds).filter(v=>v!=null))),'minutes:seconds']];
+  $('stats2').innerHTML=stats.map(s=>`<div class="card stat"><div class="label">${s[0]}</div><div class="val">${s[1]}</div><div class="delta">${s[2]}</div></div>`).join('');
+  hbar($('chart-funnel'),[{label:'Started',v:st.length},{label:'Finished',v:fi.length},{label:'Left part-way',v:ab.length}].filter(r=>st.length||fi.length||ab.length));
+  const rs={};ab.forEach(e=>{const k=REASONS[e.data?.reason]||'Other';(rs[k]=rs[k]||[]).push(answered(e))});
+  hbar($('chart-leave'),Object.entries(rs).sort((a,b)=>b[1].length-a[1].length).map(([label,l])=>{const a=avg(l.filter(v=>v!=null));return{label,v:l.length,tip:l.length+' time'+(l.length===1?'':'s')+(a==null?'':' · on average '+a+'% answered')}}));
+  const op={};E.filter(e=>e.event_type==='topic_opened'&&e.topic_id).forEach(e=>{(op[e.topic_id]=op[e.topic_id]||new Set()).add(e.user_id)});
+  hbar($('chart-opened'),Object.entries(op).sort((a,b)=>b[1].size-a[1].size).slice(0,10).map(([id,u])=>({label:tTitle(id),v:u.size,tip:u.size+' student'+(u.size===1?'':'s')})));
+  const papersIn=[...new Set(Object.values(S.snapBy).flatMap(o=>Object.keys(o)).filter(k=>k!=='overall'))].filter(p=>S.paper==='ALL'||p===S.paper).sort();
+  const rows=papersIn.map(p=>{const L=[...ids].map(u=>S.snapBy[u]?.[p]).filter(Boolean),started=L.filter(d=>(d.topics_attempted||0)>0||(d.flashcards_reviewed||0)>0);return{p,n:L.length,started:started.length,cov:avg(L.map(d=>d.coverage_pct||0)),acc:avg(started.map(d=>d.accuracy_pct||0)),q:avg(L.map(d=>d.questions_answered||0)),mocks:avg(L.map(d=>d.mocks_taken||0))}});
+  $('paperprog').innerHTML=rows.length?'<tr><th>Paper</th><th class="num">Students started</th><th class="num">Covered</th><th class="num">Accuracy</th><th class="num">Questions each</th><th class="num">Mocks each</th></tr>'+rows.map(r=>`<tr><td><span class="tag">${esc(r.p)}</span></td><td class="num">${r.started}/${r.n}</td><td class="num">${r.cov==null?'—':r.cov+'%'}</td><td class="num">${r.acc==null?'—':r.acc+'%'}</td><td class="num">${r.q==null?'—':r.q}</td><td class="num">${r.mocks==null?'—':r.mocks}</td></tr>`).join(''):'<tr><td class="empty">No progress summaries uploaded yet.</td></tr>';
+  const tp={};[...ids].forEach(u=>{const o=S.snapBy[u]||{};Object.entries(o).forEach(([p,d])=>{if(p==='overall'||(S.paper!=='ALL'&&p!==S.paper))return;(d.topics||[]).forEach(t=>{if(t.level==='not-attempted')return;const k=p+'|'+t.topic_id;const x=tp[k]=tp[k]||{p,title:t.title,sc:[],unsure:0};x.sc.push(t.score_pct||0);if(t.confidence==='unsure')x.unsure++})})});
+  const wt=Object.values(tp).map(x=>({...x,avg:avg(x.sc)})).sort((a,b)=>a.avg-b.avg||b.sc.length-a.sc.length).slice(0,10);
+  $('weaktopics').innerHTML=wt.length?'<tr><th>Paper</th><th>Topic</th><th class="num">Students attempted</th><th class="num">Average score</th><th class="num">Marked "unsure"</th></tr>'+wt.map(x=>`<tr><td><span class="tag">${esc(x.p)}</span></td><td>${esc(x.title)}</td><td class="num">${x.sc.length}</td><td class="num">${x.avg}%</td><td class="num">${x.unsure}</td></tr>`).join(''):'<tr><td class="empty">No topic data uploaded yet.</td></tr>';
+}
+function renderDetailExtra(s){
+  const o=S.snapBy[s.user_id]||{},scopes=['overall'].concat(Object.keys(o).filter(k=>k!=='overall').sort());
+  $('rings').innerHTML=o.overall?scopes.map(k=>{const d=o[k];const sub=k==='overall'?`${d.topics_attempted}/${d.topics_total} topics · ${d.questions_answered} questions · ${d.mocks_taken} mock${d.mocks_taken===1?'':'s'}`:`${d.topics_attempted}/${d.topics_total} topics · ${d.questions_answered} questions · ${d.flashcards_reviewed} flashcards`;return `<div style="display:flex;gap:12px;align-items:center">${ringSvg(d.coverage_pct,d.accuracy_pct)}<div><b>${k==='overall'?'Overall':esc(k)}</b><div class="note">${d.coverage_pct}% covered · ${d.accuracy_pct}% accuracy<br>${esc(sub)}</div></div></div>`}).join(''):'<div class="empty">No progress summary uploaded yet.</div>';
+  const chs=Object.entries(o).filter(([k])=>k!=='overall'&&(S.paper==='ALL'||k===S.paper)).flatMap(([k,d])=>(d.chapters||[]).map(c=>({p:k,...c})));
+  $('chapters').innerHTML=chs.length?'<tr><th>Paper</th><th>Chapter</th><th class="num">Covered</th><th class="num">Accuracy</th><th class="num">Tests</th><th class="num">Best</th><th class="num">Latest</th><th class="num">Open mistakes</th></tr>'+chs.map(c=>`<tr><td><span class="tag">${esc(c.p)}</span></td><td>${esc(c.title)}</td><td class="num">${c.topics_attempted}/${c.topics_total}</td><td class="num">${c.topics_attempted?c.accuracy_pct+'%':'—'}</td><td class="num">${c.tests_taken}</td><td class="num">${c.best_test_pct==null?'—':c.best_test_pct+'%'}</td><td class="num">${c.last_test_pct==null?'—':c.last_test_pct+'%'}</td><td class="num">${c.open_mistakes}</td></tr>`).join(''):'<tr><td class="empty">No chapter data uploaded yet.</td></tr>';
+  const tps=Object.entries(o).filter(([k])=>k!=='overall'&&(S.paper==='ALL'||k===S.paper)).flatMap(([k,d])=>(d.topics||[]).map(t=>({p:k,...t})));
+  tps.sort((a,b)=>(a.level==='not-attempted')-(b.level==='not-attempted')||a.score_pct-b.score_pct);
+  $('topicsT').innerHTML=tps.length?'<tr><th>Paper</th><th>Topic</th><th>Stage</th><th class="num">Score</th><th>Their rating</th><th class="num">Questions</th><th>Last attempted</th></tr>'+tps.slice(0,60).map(t=>`<tr><td><span class="tag">${esc(t.p)}</span></td><td>${esc(t.title)}</td><td>${esc(t.stage||'')}</td><td class="num">${t.level==='not-attempted'?'—':t.score_pct+'%'}</td><td>${esc(t.confidence||'—')}</td><td class="num">${t.questions_answered||0}</td><td>${t.last_attempted?fmtDY(t.last_attempted):'—'}</td></tr>`).join('')+(tps.length>60?`<tr><td class="note" colspan="7">Showing the 60 weakest of ${tps.length} topics.</td></tr>`:''):'<tr><td class="empty">No topic data uploaded yet.</td></tr>';
+  const ev=S.events.filter(e=>e.user_id===s.user_id).sort((a,b)=>b.t-a.t).slice(0,25);
+  const det=e=>{const d=e.data||{};switch(e.event_type){case'attempt_abandoned':return `${d.answered??0}/${d.total_questions??'?'} answered · ${fmtSecs(d.seconds)} · ${REASONS[d.reason]||'left'}`;case'attempt_finished':return `${d.percent??'—'}% · ${fmtSecs(d.seconds)}${d.timed_out?' · timed out':''}`;case'attempt_started':return `${d.total_questions??'?'} questions`;case'flashcard_session':return `${d.cards} cards, ${d.knew} known · ${fmtSecs(d.seconds)}`;case'topic_opened':return tTitle(e.topic_id);case'confidence_set':return `${tTitle(e.topic_id)}: ${d.level}`;default:return ''}};
+  $('activity').innerHTML=ev.length?'<tr><th>When</th><th>What</th><th>Paper</th><th>Details</th></tr>'+ev.map(e=>`<tr><td>${fmtD(e.t)}</td><td>${esc(EVLABEL[e.event_type]||e.event_type)}${e.data?.title?' — '+esc(String(e.data.title).slice(0,40)):''}</td><td>${e.paper_code?`<span class="tag">${esc(e.paper_code)}</span>`:''}</td><td>${esc(det(e))}</td></tr>`).join(''):'<tr><td class="empty">No activity recorded yet.</td></tr>';
 }
 function studentRows(){
   const ids=idset();return visibleStudents().map(s=>{const a=S.attempts.filter(x=>x.user_id===s.user_id).sort((x,y)=>x.t-y.t);const pcts=a.map(x=>x.pct).filter(v=>v!=null);const k=S.streaks.filter(x=>x.user_id===s.user_id).reduce((m,x)=>Math.max(m,x.current_streak||0),0);
-    const st=actStats(s.user_id);return{s,sessions:st.sessions,days:st.days,tests:a.length,avg:avg(pcts),trend:pcts.slice(-8),streak:k,last:lastActive(s.user_id),mistakes:S.mistakes.filter(x=>x.user_id===s.user_id).length}}).sort((a,b)=>b.last-a.last||a.s.name.localeCompare(b.s.name));
+    const st=actStats(s.user_id),ov=S.snapBy[s.user_id]?.overall;return{s,cov:ov?ov.coverage_pct:null,acc:ov&&ov.topics_attempted?ov.accuracy_pct:null,left:S.events.filter(e=>e.user_id===s.user_id&&e.event_type==='attempt_abandoned').length,sessions:st.sessions,days:st.days,tests:a.length,avg:avg(pcts),trend:pcts.slice(-8),streak:k,last:lastActive(s.user_id),mistakes:S.mistakes.filter(x=>x.user_id===s.user_id).length}}).sort((a,b)=>b.last-a.last||a.s.name.localeCompare(b.s.name));
 }
 function renderStudents(){
   const rows=studentRows();
-  $('students').innerHTML=rows.length?'<tr><th>Student</th><th>Group</th><th>Subjects</th><th>Joined</th><th>Form filled</th><th class="num">Sessions</th><th class="num">Tests</th><th class="num">Avg score</th><th>Trend</th><th class="num">Streak</th><th>Last active</th><th>Exam</th></tr>'+rows.map(r=>`<tr class="click" data-id="${esc(r.s.user_id)}"><td><b>${esc(r.s.name)}</b></td><td>${esc(r.s.group)}</td><td>${esc([].concat(r.s.subjects_interested||[]).join(', '))}</td><td>${fmtDY(r.s.created_at)}</td><td>${fmtDY(r.s.onboarding_completed_at)}</td><td class="num">${r.sessions}</td><td class="num">${r.tests}</td><td class="num">${r.avg==null?'—':r.avg+'%'}</td><td>${spark(r.trend)}</td><td class="num">${r.streak?r.streak+' d':'—'}</td><td>${ago(r.last)}</td><td>${r.s.planned_exam_date?esc(r.s.planned_exam_date):'—'}</td></tr>`).join(''):'<tr><td class="empty">No students match this filter.</td></tr>';
+  $('students').innerHTML=rows.length?'<tr><th>Student</th><th>Group</th><th>Subjects</th><th>Joined</th><th>Form filled</th><th class="num">Sessions</th><th class="num">Tests</th><th class="num">Left part-way</th><th class="num">Avg score</th><th class="num">Covered</th><th class="num">Accuracy</th><th>Trend</th><th class="num">Streak</th><th>Last active</th><th>Exam</th></tr>'+rows.map(r=>`<tr class="click" data-id="${esc(r.s.user_id)}"><td><b>${esc(r.s.name)}</b></td><td>${esc(r.s.group)}</td><td>${esc([].concat(r.s.subjects_interested||[]).join(', '))}</td><td>${fmtDY(r.s.created_at)}</td><td>${fmtDY(r.s.onboarding_completed_at)}</td><td class="num">${r.sessions}</td><td class="num">${r.tests}</td><td class="num">${r.left||'—'}</td><td class="num">${r.avg==null?'—':r.avg+'%'}</td><td class="num">${r.cov==null?'—':r.cov+'%'}</td><td class="num">${r.acc==null?'—':r.acc+'%'}</td><td>${spark(r.trend)}</td><td class="num">${r.streak?r.streak+' d':'—'}</td><td>${ago(r.last)}</td><td>${r.s.planned_exam_date?esc(r.s.planned_exam_date):'—'}</td></tr>`).join(''):'<tr><td class="empty">No students match this filter.</td></tr>';
   document.querySelectorAll('#students tr.click').forEach(tr=>tr.onclick=()=>{S.current=tr.dataset.id;select('detail')});
 }
 function renderDetail(){
@@ -216,6 +258,7 @@ function renderDetail(){
   <div class="kv"><b>Tests taken</b><span>${A.length}</span><b>Average score</b><span>${avg(pcts.map(a=>a.pct))==null?'—':avg(pcts.map(a=>a.pct))+'%'}</span><b>Study streak</b><span>${streak?streak+' days':'—'}</span><b>Last active</b><span>${ago(lastActive(s.user_id))}</span><b>Joined</b><span>${fmtDY(s.created_at)}</span><b>Form filled</b><span>${fmtDY(s.onboarding_completed_at)}</span><b>Total sessions</b><span>${actStats(s.user_id).sessions}</span><b>Active days</b><span>${actStats(s.user_id).days}</span></div>
   <select id="pick" aria-label="Choose student">${vs.map(x=>`<option value="${esc(x.user_id)}" ${x.user_id===s.user_id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div>`;
   $('pick').onchange=e=>{S.current=e.target.value;renderDetail()};
+  renderDetailExtra(s);
   lineChart($('chart-trend'),pcts.map(a=>a.pct),pcts.map(a=>fmtD(a.t)),{name:'Score',unit:'%',max:100,ref:50,every:Math.ceil(pcts.length/8)||1,extra:pcts.map(a=>(a.kind==='mock'?'Mock exam':'Chapter test')+' · '+a.paper_code)});
   const tm={};M.forEach(m=>{const k=m.paper_code+' · '+(m.data?.topic_title||m.topic_id||'Unknown topic');tm[k]=(tm[k]||0)+1});
   hbar($('chart-sweak'),Object.entries(tm).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([label,v])=>({label,v,tip:v+' mistakes'})));
@@ -230,8 +273,8 @@ function renderTeam(){
 }
 function exportCsv(){
   const safe=v=>{v=String(v??'');if(/^[=+\-@\t\r]/.test(v))v="'"+v;return '"'+v.replace(/"/g,'""')+'"'};
-  const hdr=['Name','Group','Subjects','Exam date','Tests','Average score %','Mistakes','Streak days','Last active','Joined','Form filled','Sessions','Active days','Email','Phone'];
-  const lines=[hdr.map(safe).join(',')].concat(studentRows().map(r=>[r.s.name,r.s.group,[].concat(r.s.subjects_interested||[]).join('; '),r.s.planned_exam_date||'',r.tests,r.avg??'',r.mistakes,r.streak,r.last?new Date(r.last).toISOString().slice(0,10):'',r.s.created_at?String(r.s.created_at).slice(0,10):'',r.s.onboarding_completed_at?String(r.s.onboarding_completed_at).slice(0,10):'',r.sessions,r.days].concat([r.s.email||'',r.s.phone||'']).map(safe).join(',')));
+  const hdr=['Name','Group','Subjects','Exam date','Tests','Average score %','Mistakes','Streak days','Last active','Joined','Form filled','Sessions','Active days','Tests left part-way','Covered %','Accuracy %','Email','Phone'];
+  const lines=[hdr.map(safe).join(',')].concat(studentRows().map(r=>[r.s.name,r.s.group,[].concat(r.s.subjects_interested||[]).join('; '),r.s.planned_exam_date||'',r.tests,r.avg??'',r.mistakes,r.streak,r.last?new Date(r.last).toISOString().slice(0,10):'',r.s.created_at?String(r.s.created_at).slice(0,10):'',r.s.onboarding_completed_at?String(r.s.onboarding_completed_at).slice(0,10):'',r.sessions,r.days,r.left,r.cov??'',r.acc??''].concat([r.s.email||'',r.s.phone||'']).map(safe).join(',')));
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([lines.join('\n')],{type:'text/csv'}));a.download='metirion-students-'+new Date().toISOString().slice(0,10)+'.csv';a.click();URL.revokeObjectURL(a.href);
 }
 function select(t){if(t==='team'&&!isOwner())t='overview';S.tab=t;document.querySelectorAll('.tab').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===t));['overview','students','detail','team'].forEach(x=>$('tab-'+x).classList.toggle('hidden',x!==t));$('filters').style.display=t==='team'?'none':'flex';({overview:renderOverview,students:renderStudents,detail:renderDetail,team:renderTeam})[t]()}
@@ -252,10 +295,21 @@ function shell(){
     <div class="card"><h3>Topic mastery by paper</h3><p class="hint">Latest level per topic, all students</p><div id="chart-mastery"></div><div class="legend" id="mastery-legend"></div></div></div>
    <div class="grid g2" style="margin-top:14px"><div class="card"><h3>Topics with most mistakes</h3><p class="hint">Number of wrong answers logged</p><div id="chart-weak"></div></div>
     <div class="card"><h3>Most-missed questions</h3><p class="hint">Useful for teaching</p><div class="tablewrap"><table id="missed"></table></div></div></div>
-   <div class="grid g2" style="margin-top:14px"><div class="card"><h3>Study mode</h3><div id="chart-mode"></div></div><div class="card"><h3>How students heard about Metirion</h3><div id="chart-ref"></div></div></div></section>
+   <div class="grid g2" style="margin-top:14px"><div class="card"><h3>Study mode</h3><div id="chart-mode"></div></div><div class="card"><h3>How students heard about Metirion</h3><div id="chart-ref"></div></div></div>
+   <h2 style="font-size:16px;margin:26px 0 10px">Engagement &amp; progress</h2>
+   <div class="grid g4" id="stats2"></div>
+   <div class="grid g2" style="margin-top:14px"><div class="card"><h3>Test completion</h3><p class="hint">Tests started, finished, and left part-way</p><div id="chart-funnel"></div></div>
+    <div class="card"><h3>Why students leave tests</h3><p class="hint">What they did, and how far they had got</p><div id="chart-leave"></div></div></div>
+   <div class="grid g2" style="margin-top:14px"><div class="card"><h3>Most-opened topics</h3><p class="hint">Students who opened the topic in this period</p><div id="chart-opened"></div></div>
+    <div class="card"><h3>Progress by paper</h3><p class="hint">Average of each student's progress rings</p><div class="tablewrap"><table id="paperprog"></table></div><div class="legend"><span><i style="background:var(--seq3)"></i>Covered = topics touched</span><span><i style="background:var(--up)"></i>Accuracy = answers right</span></div></div></div>
+   <div class="card" style="margin-top:14px"><h3>Weakest topics</h3><p class="hint">Lowest average score among students who have attempted the topic</p><div class="tablewrap"><table id="weaktopics"></table></div></div></section>
   <section id="tab-students" class="hidden"><div class="card"><h3>All students</h3><p class="hint">Select a student to see their full progress</p><div class="tablewrap"><table id="students"></table></div></div></section>
   <section id="tab-detail" class="hidden"><div class="card" id="detail-head"></div><div class="grid g2" style="margin-top:14px"><div class="card"><h3>Score trend</h3><p class="hint">Every test, oldest to newest · dashed line = 50%</p><div id="chart-trend"></div></div><div class="card"><h3>Topics with most mistakes</h3><div id="chart-sweak"></div></div></div>
-   <div class="grid g2" style="margin-top:14px"><div class="card"><h3>Recent tests</h3><div class="tablewrap"><table id="recent"></table></div></div><div class="card"><h3>Recent mistakes</h3><div class="tablewrap"><table id="smistakes"></table></div></div></div></section>
+   <div class="grid g2" style="margin-top:14px"><div class="card"><h3>Recent tests</h3><div class="tablewrap"><table id="recent"></table></div></div><div class="card"><h3>Recent mistakes</h3><div class="tablewrap"><table id="smistakes"></table></div></div></div>
+   <div class="card" style="margin-top:14px"><h3>Progress rings</h3><p class="hint">What the student sees on their Progress tab</p><div id="rings" class="grid g4"></div></div>
+   <div class="card" style="margin-top:14px"><h3>Chapters</h3><div class="tablewrap"><table id="chapters"></table></div></div>
+   <div class="card" style="margin-top:14px"><h3>Topics</h3><p class="hint">Weakest first · from their latest upload</p><div class="tablewrap"><table id="topicsT"></table></div></div>
+   <div class="card" style="margin-top:14px"><h3>Recent activity</h3><p class="hint">Includes tests started but not finished</p><div class="tablewrap"><table id="activity"></table></div></div></section>
   <section id="tab-team" class="hidden"><div class="card"><h3>Who can see this dashboard</h3><p class="hint">Everyone signs in with their own email link. Access is enforced by the database, not just this page.</p><div class="tablewrap"><table id="team"></table></div>
    <form id="addbox" class="hidden" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap"><input type="email" id="ae" placeholder="new admin email" required><input type="text" id="ao" placeholder="Organisation (e.g. Klarion)"><button class="btn gold" type="submit">Add admin</button><span class="note" id="am"></span></form></div></section>`;
   $('range').querySelectorAll('button').forEach(b=>b.onclick=()=>{S.range=+b.dataset.r;$('range').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b));select(S.tab)});
