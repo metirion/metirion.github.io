@@ -265,9 +265,15 @@ function renderDetail(){
   $('recent').innerHTML=A.length?'<tr><th>Date</th><th>Test</th><th class="num">Score</th></tr>'+A.slice().reverse().slice(0,8).map(a=>`<tr><td>${fmtD(a.t)}</td><td>${esc(a.paper_code)} · ${a.kind==='mock'?'Mock exam':esc(a.data?.chapter_title||a.chapter_id||'Chapter test')}</td><td class="num">${a.score??'—'}/${a.total_marks??'—'}${a.pct!=null?' ('+a.pct+'%)':''}</td></tr>`).join(''):'<tr><td class="empty">No tests uploaded yet.</td></tr>';
   $('smistakes').innerHTML=M.length?'<tr><th>Topic</th><th>Their answer</th><th>Correct</th></tr>'+M.slice(0,8).map(m=>`<tr><td><span class="tag">${esc(m.paper_code)}</span>${esc(m.data?.topic_title||m.topic_id||'')}</td><td>${esc(m.data?.chosen??m.data?.your_answer??'—')}</td><td>${esc(m.data?.correct??m.data?.correct_answer??'—')}</td></tr>`).join(''):'<tr><td class="empty">No mistakes uploaded yet.</td></tr>';
 }
+function lastLogin(email){
+  if(!S.logins)return '<span class="note">Not available</span>';
+  const v=S.logins[email];if(!v)return '<span class="note">Never</span>';
+  const t=+new Date(v);
+  return esc(new Date(t).toLocaleString([],{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}))+' <span class="note">('+ago(t)+')</span>';
+}
 function renderTeam(){
   const owner=isOwner();
-  $('team').innerHTML='<tr><th>Email</th><th>Role</th><th>Organisation</th><th></th></tr>'+S.team.map(t=>`<tr><td>${esc(t.email)}</td><td><span class="tag">Administrator</span></td><td>${esc(t.organisation||'')}</td><td>${owner&&t.role!=='owner'?`<button class="btn small" data-rm="${esc(t.email)}">Remove</button>`:''}</td></tr>`).join('');
+  $('team').innerHTML='<tr><th>Email</th><th>Role</th><th>Organisation</th><th>Last sign-in</th><th></th></tr>'+S.team.map(t=>`<tr><td>${esc(t.email)}</td><td><span class="tag">${t.role==='owner'?'Owner':'Administrator'}</span></td><td>${esc(t.organisation||'')}</td><td>${lastLogin(t.email)}</td><td>${owner&&t.role!=='owner'?`<button class="btn small" data-rm="${esc(t.email)}">Remove</button>`:''}</td></tr>`).join('');
   document.querySelectorAll('[data-rm]').forEach(b=>b.onclick=async()=>{if(!confirm('Remove '+b.dataset.rm+' from the dashboard?'))return;const {error}=await sb.from('admin_users').delete().eq('email',b.dataset.rm);if(error)return alert(error.message);S.team=S.team.filter(t=>t.email!==b.dataset.rm);renderTeam()});
   $('addbox').classList.toggle('hidden',!owner);
 }
@@ -326,6 +332,8 @@ async function start(){
   S.email=(session.user.email||'').toLowerCase();
   const adm=await sb.rpc('is_admin');if(adm.error||!adm.data)return noAccess(S.email);
   const own=await sb.rpc('is_owner');S.role=own.data?'owner':'admin';
+  S.logins=null;
+  if(S.role==='owner'){try{const r=await sb.rpc('admin_last_logins');if(!r.error&&r.data)S.logins=Object.fromEntries(r.data.map(x=>[String(x.email).toLowerCase(),x.last_sign_in_at]))}catch(e){}}
   try{await loadAll()}catch(e){$('app').innerHTML=`<div class="card login"><h2>Couldn't load data</h2><p class="err">${esc(e.message||e)}</p><button class="btn" onclick="location.reload()">Try again</button></div>`;return}
   if(location.hash)history.replaceState(null,'',location.pathname);
   shell();
